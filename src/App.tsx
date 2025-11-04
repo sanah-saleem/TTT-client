@@ -19,6 +19,7 @@ export default function App() {
   const [lastError, setLastError] = useState<string | null>(null);
   const [roomCode, setRoomCode] = useState("");
   const [currentMatchId, setCurrentMatchId] = useState<string | null>(null);
+  const [now, setNow] = useState(() => Date.now());
 
   // authenticate + connect once
   useEffect(() => {
@@ -50,6 +51,19 @@ export default function App() {
   useEffect(() => {
     setCurrentMatchId(getCurrentMatchId());
   }, [state]);
+
+  useEffect(() => {
+    if (state?.status === "playing" && state?.turnDeadlineMs) {
+      const id = setInterval(() => setNow(Date.now()), 250)
+      return () => clearInterval(id);
+    }
+  }, [state?.status, state?.turnDeadlineMs]);
+
+  const secondsLeft = useMemo(() => {
+    if(!state?.turnDeadlineMs) return null;
+    const ms = state.turnDeadlineMs - now;
+    return Math.max(0, Math.ceil(ms/1000));
+  }, [state?.turnDeadlineMs, now]);
 
   const me = getSession()?.user_id ?? null;
   const mySymbol = useMemo(() => (state?.symbols && me ? state.symbols[me] : undefined), [state, me]);
@@ -196,7 +210,12 @@ export default function App() {
 
         {/* Board + HUD */}
         <div className="rounded-2xl bg-slate-800 p-4 flex flex-col items-center gap-4">
-          <div className="text-sm opacity-90 min-h-[1.25rem]">{statusText}</div>
+          <div className="text-sm opacity-90 min-h-[1.25rem]">
+            {statusText}
+            {state?.status === "playing" && typeof secondsLeft === "number" && (
+              <span className="ml-2 opacity-80">({secondsLeft}s)</span>
+            )}
+            </div>
 
           <div className="grid grid-cols-3 gap-2 w-full max-w-sm">
             {[...Array(9)].map((_, i) => {

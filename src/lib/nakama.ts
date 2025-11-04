@@ -17,6 +17,7 @@ export interface TttState {
   winner: string | null;    // user_id or null
   players?: (string | null)[];
   symbols?: Record<string, "X" | "O">;
+  turnDeadlineMs?: number;
 }
 
 export type NakamaHandlers = {
