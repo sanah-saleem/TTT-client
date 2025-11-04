@@ -8,6 +8,7 @@ const useSSL = (import.meta.env.VITE_NAKAMA_SSL ?? "false") === "true";
 export const OP_MOVE  = 1;
 export const OP_STATE = 2;
 export const OP_ERROR = 3;
+export const OP_RESTART = 4;
 
 export interface TttState {
   board: string[];          // length 9, "", "X", "O"
@@ -55,25 +56,35 @@ export async function initNakama(handlers: NakamaHandlers = {}) {
 
   // wire listeners
   socket.onmatchdata = (md) => {
+    const decoder = new TextDecoder();
     if (md.op_code === OP_STATE) {
       try {
-        const s = JSON.parse(new TextDecoder().decode(md.data)) as TttState;
+        const s = JSON.parse(decoder.decode(md.data)) as TttState;
         handlers.onState?.(s);
       } catch (e) {
         handlers.onError?.("Failed to parse server state.");
       }
     } else if (md.op_code === OP_ERROR) {
-      const msg = new TextDecoder().decode(md.data);
-      handlers.onError?.(msg);
+      const msg = decoder.decode(md.data);
+      try {
+        const obj = JSON.parse(msg);
+        handlers.onError?.(obj?.msg ?? "Unknown error");
+      } catch {
+        handlers.onError?.(msg || "Unknown error");
+      }
     }
   };
 
-  socket.ondisconnect = (evt) => handlers.onDisconnect?.(evt);
+  socket.ondisconnect = (evt) => {
+    currentMatchId = null;
+    handlers.onDisconnect?.(evt);
+  }
+    
 
   socket.onmatchmakermatched = async (matched) => {
-    handlers.onMatched?.(matched);
     const match = await socket!.joinMatch(matched.match_id);
     currentMatchId = match.match_id;
+    handlers.onMatched?.(matched);
   };
 
   return { client, session, socket };
@@ -115,4 +126,9 @@ export async function sendMove(cell: number) {
   if (!socket || !currentMatchId) throw new Error("No match to play in.");
   const payload = new TextEncoder().encode(JSON.stringify({ cell }));
   await socket.sendMatchState(currentMatchId, OP_MOVE, payload);
+}
+
+export async function restartGame() {
+  if (!socket || !currentMatchId) throw new Error("No Match");
+  await socket.sendMatchState(currentMatchId, OP_RESTART, new Uint8Array());
 }

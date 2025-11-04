@@ -10,6 +10,7 @@ import {
   getCurrentMatchId,
   getSession,
   type TttState,
+  restartGame,
 } from "./lib/nakama";
 
 export default function App() {
@@ -61,7 +62,8 @@ export default function App() {
       return isMyTurn ? "Your turn!" : "Opponent's turn…";
     }
     if (state.status === "ended") {
-      if (state.winner === null) return "Draw!";
+      const noWinner = (state as any).winner === undefined || state === null;
+      if(noWinner) return "Draw!";
       return state.winner === me ? "You won! 🎉" : "You lost. 😶";
     }
     return "…";
@@ -105,6 +107,7 @@ export default function App() {
       await leaveKnownMatch();
       setCurrentMatchId(null);
       setState(null);
+      setRoomCode("");
     } catch (e: any) {
       setLastError(e?.message ?? "Failed to leave match.");
     }
@@ -116,6 +119,15 @@ export default function App() {
       await sendCellMove(i1to9);
     } catch (e: any) {
       setLastError(e?.message ?? "Failed to send move.");
+    }
+  }
+
+  async function playAgain() {
+    setLastError(null);
+    try {
+      await restartGame();
+    } catch (e: any) {
+      setLastError(e?.message ?? "Failed to restart");
     }
   }
 
@@ -141,16 +153,16 @@ export default function App() {
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex min-w-0 items-center gap-2">
             <input
-              className="flex-1 px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 outline-none"
+              className="min-w-0 flex-1 px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 outline-none"
               placeholder="Enter room code"
               value={roomCode}
               onChange={(e) => setRoomCode(e.target.value)}
             />
             <button
-              className="px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 disabled:opacity-50"
-              disabled={!connected}
+              className="shrink-0 px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 disabled:opacity-50"
+              disabled={!connected || roomCode.trim().length === 0}
               onClick={joinRoom}
             >
               Join
@@ -220,6 +232,33 @@ export default function App() {
               {mySymbol || "—"}
             </span>
           </div>
+          {/* Play Again (only when game ended) */}
+          {state?.status === "ended" && currentMatchId && (
+            <div className="w-full max-w-sm mt-2">
+              <div className="rounded-xl bg-slate-900/70 border border-slate-700 p-3 flex items-center justify-between">
+                <div className="text-sm">
+                  {/* Use the same draw-safe check as below */}
+                  {((state as any).winner === undefined || state.winner === null) ? (
+                    <span>It’s a draw.</span>
+                  ) : state.winner === me ? (
+                    <span className="font-medium">You won! 🎉</span>
+                  ) : (
+                    <span className="font-medium">You lost. 😶</span>
+                  )}
+                </div>
+                <button
+                  onClick={playAgain}
+                  className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-sm disabled:opacity-50"
+                  disabled={!connected}
+                  aria-label="Play again"
+                  title="Play again"
+                >
+                  Play Again
+                </button>
+              </div>
+            </div>
+          )}
+
         </div>
 
         {/* Errors */}
