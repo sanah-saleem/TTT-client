@@ -1,7 +1,7 @@
+import AuthPanel from "./components/AuthPanel";
 import { useEffect, useMemo, useState } from "react";
 import { clsx as cls } from "clsx";
 import {
-  initNakama,
   createRoom,
   joinRoom as joinKnownRoom,
   leaveMatch as leaveKnownMatch,
@@ -21,37 +21,38 @@ export default function App() {
   const [currentMatchId, setCurrentMatchId] = useState<string | null>(null);
   const [now, setNow] = useState(() => Date.now());
 
-  // authenticate + connect once
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        await initNakama({
-          onState: (s) => setState(s),
-          onError: (msg) => setLastError(msg),
-          onDisconnect: () => {
-            setConnected(false);
-            setCurrentMatchId(null);
-          },
-          onMatched: () => {
-            setCurrentMatchId(getCurrentMatchId());
-          },
-        });
-        if (!cancelled) {
-          setConnected(true);
-        }
-      } catch (e: any) {
-        if (!cancelled) setLastError(e?.message ?? "Failed to connect.");
-      }
-    })();
-    return () => { cancelled = true; };
-  }, []);
+  // // authenticate + connect once
+  // useEffect(() => {
+  //   let cancelled = false;
+  //   (async () => {
+  //     try {
+  //       await initNakama({+
+  //         onState: (s) => setState(s),
+  //         onError: (msg) => setLastError(msg),
+  //         onDisconnect: () => {
+  //           setConnected(false);
+  //           setCurrentMatchId(null);
+  //         },
+  //         onMatched: () => {
+  //           setCurrentMatchId(getCurrentMatchId());
+  //         },
+  //       });
+  //       if (!cancelled) {
+  //         setConnected(true);
+  //       }
+  //     } catch (e: any) {
+  //       if (!cancelled) setLastError(e?.message ?? "Failed to connect.");
+  //     }
+  //   })();
+  //   return () => { cancelled = true; };
+  // }, []);
 
-  // track currentMatchId from Nakama module
+  // track currentMatchId in sync whenever we get state updates.
   useEffect(() => {
     setCurrentMatchId(getCurrentMatchId());
   }, [state]);
 
+  // Tick the timer while a turn deadline is active.
   useEffect(() => {
     if (state?.status === "playing" && state?.turnDeadlineMs) {
       const id = setInterval(() => setNow(Date.now()), 250)
@@ -152,6 +153,26 @@ export default function App() {
       </header>
 
       <main className="w-full max-w-xl px-4 py-4 flex flex-col gap-4">
+        <AuthPanel
+          handlers={{
+            onState: (s) => setState(s),
+            onError: (msg) => setLastError(msg),
+            onDisconnect: () => {
+              setConnected(false);
+              setCurrentMatchId(null);
+            },
+            onMatched: () => {
+              setCurrentMatchId(getCurrentMatchId());
+            },
+          }}
+          onConnected={() => setConnected(true)}
+          onDisconnected={() => {
+            setConnected(false);
+            setState(null);
+            setCurrentMatchId(null);
+          }}
+        />
+
         {/* Connect / Room controls */}
         <div className="rounded-2xl bg-slate-800 p-4 grid grid-cols-1 md:grid-cols-2 gap-3">
           <div className="flex items-center gap-2">
@@ -252,7 +273,7 @@ export default function App() {
             </span>
           </div>
           {/* Play Again (only when game ended) */}
-          {state?.status === "ended" && currentMatchId && (
+          {state?.status === "ended" && currentMatchId && (state?.players?.filter(Boolean).length ?? 0) === 2 && (
             <div className="w-full max-w-sm mt-2">
               <div className="rounded-xl bg-slate-900/70 border border-slate-700 p-3 flex items-center justify-between">
                 <div className="text-sm">
