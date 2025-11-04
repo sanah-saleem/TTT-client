@@ -11,6 +11,7 @@ import {
   getSession,
   type TttState,
   restartGame,
+  restoreAndConnect,
 } from "./lib/nakama";
 
 export default function App() {
@@ -84,6 +85,7 @@ export default function App() {
     return "…";
   }, [state, isMyTurn, me]);
 
+
   // Handlers
   async function handleCreate() {
     setLastError(null);
@@ -128,6 +130,38 @@ export default function App() {
     }
   }
 
+  // for session persistence on reload
+  useEffect(() => {
+    let cancelled = false;
+
+    (async () => {
+      try {
+        const ok = await restoreAndConnect(
+          {
+            onState: (s) => !cancelled && setState(s),
+            onError: (msg) => !cancelled && setLastError(msg),
+            onDisconnect: () => {
+              if (!cancelled) {
+                setConnected(false);
+                setCurrentMatchId(null);
+              }
+            },
+            onMatched: () => !cancelled && setCurrentMatchId(getCurrentMatchId()),
+          },
+          { fallbackToGuest: true } // or false if you don't want auto-guest
+        );
+
+        if (!cancelled && ok) {
+          setConnected(true);
+        }
+      } catch (e: any) {
+        if (!cancelled) setLastError(e?.message ?? "Failed to restore session.");
+      }
+    })();
+
+    return () => { cancelled = true; };
+  }, []);
+
   async function sendMove(i1to9: number) {
     setLastError(null);
     try {
@@ -154,6 +188,7 @@ export default function App() {
 
       <main className="w-full max-w-xl px-4 py-4 flex flex-col gap-4">
         <AuthPanel
+          connected = {connected}
           handlers={{
             onState: (s) => setState(s),
             onError: (msg) => setLastError(msg),

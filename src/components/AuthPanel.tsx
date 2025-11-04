@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   loginGuest,
   loginEmail,
@@ -13,9 +13,10 @@ type Props = {
   onConnected?: () => void;          // called after socket connects
   onDisconnected?: () => void;       // called when user logs out or socket drops
   handlers: NakamaHandlers;          // your onState/onError/etc from App
+  connected?: boolean;               // tells panel when socket is live
 };
 
-export default function AuthPanel({ handlers, onConnected, onDisconnected }: Props) {
+export default function AuthPanel({ handlers, onConnected, onDisconnected, connected }: Props) {
   const [mode, setMode] = useState<"guest" | "login" | "register">("guest");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -60,6 +61,20 @@ export default function AuthPanel({ handlers, onConnected, onDisconnected }: Pro
       setBusy(false);
     }
   }
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      if (!connected) { setWhoami(null); return; }
+      try {
+        const acc = await getAccount();
+        if (!cancelled) setWhoami(acc.user?.username || acc.user?.id || "Me");
+      } catch {
+        /* ignore – will still be connected as guest */
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [connected]);
 
   return (
     <div className="rounded-2xl bg-slate-800 p-4 grid gap-3">

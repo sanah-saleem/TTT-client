@@ -201,6 +201,30 @@ export async function connectSocket(handlers: NakamaHandlers = {}) {
 
 }
 
+export async function restoreAndConnect (
+  handlers: NakamaHandlers = {},
+  opts: { fallbackToGuest?: boolean } = { fallbackToGuest: true}
+) : Promise<boolean> {
+  //Try to load an existing session from localStorage
+  const cached = loadSession();
+  if(cached) {
+    session = cached;
+    try {
+      await connectSocket(handlers);
+      return true;
+    } catch {
+      //if socket connect fails, we'll try the fallback below.
+    }
+  }
+  //fallback to guest if no cached session
+  if (opts.fallbackToGuest) {
+    await loginGuest();
+    await connectSocket(handlers);
+    return true;
+  }
+  return false;
+}
+
 export async function initNakama(handlers: NakamaHandlers = {}) {
   await loginGuest();
   await connectSocket(handlers);
