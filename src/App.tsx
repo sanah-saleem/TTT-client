@@ -12,6 +12,7 @@ import {
   type TttState,
   restartGame,
   restoreAndConnect,
+  tryRejoinLastMatch,
 } from "./lib/nakama";
 
 export default function App() {
@@ -132,6 +133,10 @@ export default function App() {
 
   // for session persistence on reload
   useEffect(() => {
+    if(currentMatchId) localStorage.setItem("ttt_last_match", currentMatchId);
+  }, [currentMatchId])
+
+  useEffect(() => {
     let cancelled = false;
 
     (async () => {
@@ -153,6 +158,8 @@ export default function App() {
 
         if (!cancelled && ok) {
           setConnected(true);
+          // Optional: attempt to rejoin last match
+          try { await tryRejoinLastMatch(); } catch {}
         }
       } catch (e: any) {
         if (!cancelled) setLastError(e?.message ?? "Failed to restore session.");

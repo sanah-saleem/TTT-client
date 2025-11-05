@@ -187,7 +187,6 @@ export async function connectSocket(handlers: NakamaHandlers = {}) {
   };
 
   socket.ondisconnect = (evt) => {
-    currentMatchId = null;
     handlers.onDisconnect?.(evt);
   };
 
@@ -225,6 +224,19 @@ export async function restoreAndConnect (
   return false;
 }
 
+export async function tryRejoinLastMatch(): Promise<boolean> {
+  const last = localStorage.getItem("ttt_last_match");
+  if (!last || !socket) return false;
+  try {
+    const match = await socket.joinMatch(last);
+    currentMatchId = match.match_id;
+    return true;
+  } catch {
+    localStorage.removeItem("ttt_last_match");
+    return false;
+  }
+}
+
 export async function initNakama(handlers: NakamaHandlers = {}) {
   await loginGuest();
   await connectSocket(handlers);
@@ -254,6 +266,7 @@ export async function leaveMatch() {
     await socket.leaveMatch(currentMatchId);
   }
   currentMatchId = null;
+  try { localStorage.removeItem("ttt_last_match"); } catch {}
 }
 
 export async function quickMatch() {
